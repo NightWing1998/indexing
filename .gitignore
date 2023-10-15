@@ -15,3 +15,6 @@ secondary/cmd/projector/projector
 secondary/protobuf/data/*.pb.go
 secondary/protobuf/projector/*.pb.go
 secondary/protobuf/query/*.pb.go
+build/
+.vscode
+.devcontainer

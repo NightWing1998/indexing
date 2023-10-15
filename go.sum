@@ -82,6 +82,8 @@ github.com/couchbase/go-slab v0.0.0-20220303011136-e47646b420b3/go.mod h1:UjNSZv
 github.com/couchbase/gocb/v2 v2.5.4 h1:7aWoVvg/C6OL3QZyZXzTNuMLbtYhipJV/QOkyqR4jqY=
 github.com/couchbase/gocb/v2 v2.5.4/go.mod h1:alZpkl4KFJc9fhCmeftbIewDdQiIh5hoMUpjiE+dM2g=
 github.com/couchbase/gocbcore/v10 v10.1.6/go.mod h1:qkPnOBziCs0guMEEvd0cRFo+AjOW0yEL99cU3I4n3Ao=
+github.com/couchbase/gocbcore/v10 v10.2.4-0.20230511103754-8dd1a95f5f33 h1:l6O5889o5cJBwWt1gws5q5dzi/slDba/KvGNiWY9ieQ=
+github.com/couchbase/gocbcore/v10 v10.2.4-0.20230511103754-8dd1a95f5f33/go.mod h1:lYQIIk+tzoMcwtwU5GzPbDdqEkwkH3isI2rkSpfL0oM=
 github.com/couchbase/gocbcore/v10 v10.2.6-0.20230628164442-47b8f45095ec h1:X5KQr59IwGF6UUSQLQWjnjUVQuIhtXchle7NsB7a6/8=
 github.com/couchbase/gocbcore/v10 v10.2.6-0.20230628164442-47b8f45095ec/go.mod h1:lYQIIk+tzoMcwtwU5GzPbDdqEkwkH3isI2rkSpfL0oM=
 github.com/couchbase/gocbcore/v9 v9.1.8 h1:79VOjo+lOJpEG99vA6AIQCuwMizYe1TUDK2ynaDNHqQ=

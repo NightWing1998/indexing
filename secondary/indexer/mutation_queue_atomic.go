@@ -154,6 +154,7 @@ func (q *atomicMutationQueue) Enqueue(mutation *MutationKeys,
 	n.mutation = mutation
 	n.next = nil
 
+	trackMem(n.mutation.Size())
 	atomic.AddInt64(q.memUsed, n.mutation.Size())
 
 	//point tail's next to new node
@@ -219,6 +220,7 @@ func (q *atomicMutationQueue) dequeueUptoSeqno(vbucket Vbucket, seqno uint64,
 				//send mutation to caller
 				dequeueSeq = m.meta.seqno
 				datach <- m
+				trackMem(-m.Size())
 			} else {
 				logging.Warnf("Indexer::MutationQueue Dequeue Aborted For "+
 					"Seqno %v KeyspaceId %v Vbucket %v. Last Dequeue %v Head Seqno %v.", seqno,
@@ -279,6 +281,7 @@ func (q *atomicMutationQueue) dequeue(vbucket Vbucket, datach chan *MutationKeys
 		}
 		//send mutation to caller
 		datach <- m
+		trackMem(-m.Size())
 	}
 
 }
@@ -356,6 +359,8 @@ func (q *atomicMutationQueue) dequeueN(vbucket Vbucket, count uint64,
 				dequeueSeq = m.meta.seqno
 				currCount++
 				datach <- m
+				trackMem(-m.Size())
+				trackMem(-nodeSz)
 			}
 
 			//once count is reached, close the channel
@@ -424,6 +429,7 @@ func (q *atomicMutationQueue) allocNode(vbucket Vbucket, appch StopChannel) *nod
 			if totalWait > 300000 { // 5mins
 				logging.Warnf("Indexer::MutationQueue Max Wait Period for Node "+
 					"Alloc Expired %v. Forcing Alloc. KeyspaceId %v Vbucket %v", totalWait, q.keyspaceId, vbucket)
+				trackMem(nodeSz)
 				return &node{}
 			} else if totalWait > 5000 {
 				if totalWait%3000 == 0 {
@@ -438,6 +444,7 @@ func (q *atomicMutationQueue) allocNode(vbucket Vbucket, appch StopChannel) *nod
 		case <-appch:
 			//caller no longer wants to wait
 			//allocate new node and return
+			trackMem(nodeSz)
 			return &node{}
 
 		}
@@ -447,9 +454,15 @@ func (q *atomicMutationQueue) allocNode(vbucket Vbucket, appch StopChannel) *nod
 
 }
 
+var nodeSz int64
+
+func init() {
+	nodeSz = int64(unsafe.Sizeof(node{}))
+}
+
 func (q *atomicMutationQueue) checkMemAndAlloc(vbucket Vbucket) *node {
 
-	currMem := atomic.LoadInt64(q.memUsed)
+	currMem := getInUse()
 	maxMem := atomic.LoadInt64(q.maxMemory)
 	currLen := atomic.LoadInt64(&q.size[vbucket])
 	minQueueLen := atomic.LoadUint64(&q.minQueueLen)
@@ -461,6 +474,7 @@ func (q *atomicMutationQueue) checkMemAndAlloc(vbucket Vbucket) *node {
 			return n
 		} else {
 			//allocate new node and return
+			trackMem(nodeSz)
 			return &node{}
 		}
 	} else {

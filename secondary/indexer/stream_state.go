@@ -1506,6 +1506,7 @@ func (ss *StreamState) getNextStabilityTS(streamId common.StreamId,
 
 	//generate new stability timestamp
 	tsVbuuid := ss.streamKeyspaceIdHWTMap[streamId][keyspaceId].Copy()
+	trackMem(tsVbuuid.Size())
 
 	//Explicitly set the snapAligned flag to false as the initial state.
 	//HWT can be set from an earlier restartTs which is snap aligned
