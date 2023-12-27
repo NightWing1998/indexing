@@ -2412,6 +2412,10 @@ func (idx *indexer) handleRecoverIndex(msg Message) {
 		// testcode - not used in production
 		testcode.CorruptIndex(idx.config, &indexInst)
 
+		////////////// Testing code - Not used in production //////////////
+		testcode.TestActionAtTag(idx.config, testcode.DEST_INDEXER_BEFORE_INDEX_RECOVERY)
+		///////////////////////////////////////////////////////////////////
+
 		//allocate partition/slice
 		partnInstMap, failedPartnInstances, partnShardIdMap, err := idx.initPartnInstance(
 			indexInst,
@@ -2423,6 +2427,10 @@ func (idx *indexer) handleRecoverIndex(msg Message) {
 			idxStats,
 			cancelRecoveryCh, // cancelCh
 		)
+
+		////////////// Testing code - Not used in production //////////////
+		testcode.TestActionAtTag(idx.config, testcode.DEST_INDEXER_AFTER_INDEX_RECOVERY)
+		///////////////////////////////////////////////////////////////////
 
 		// In case of nil error, send a message to indexer to add this instance
 		// to the index instance map. Otherwise, dont do anything as the error
