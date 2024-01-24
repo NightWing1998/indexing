@@ -1196,6 +1196,8 @@ func (o *MetadataProvider) waitForScheduledIndex(idxDefn *c.IndexDefn) error {
 			states = []c.IndexState{c.INDEX_STATE_ACTIVE, c.INDEX_STATE_DELETED}
 		}
 
+		var closeCh = make(chan struct{})
+
 		tok, err := mc.GetScheduleCreateToken(idxDefn.DefnId)
 		if err != nil {
 			logging.Errorf("MetadataProvider:waitForScheduledIndex error in GetScheduleCreateToken for %v", idxDefn.DefnId)
@@ -1277,8 +1279,13 @@ func (o *MetadataProvider) waitForScheduledIndex(idxDefn *c.IndexDefn) error {
 
 					exists, err := mc.DeleteCommandTokenExist(idxDefn.DefnId)
 					if err != nil {
-						o.repo.cancelEvent(idxDefn.DefnId, err)
-						return
+						logging.Warnf("MetadataProvider::waitForScheduledIndex failed to read delete command token for index defn %v with error %v",
+							idxDefn.DefnId, err)
+						if count > 20 {
+							o.repo.cancelEvent(idxDefn.DefnId, err)
+							return
+						}
+						continue
 					}
 
 					if exists {
@@ -1288,8 +1295,13 @@ func (o *MetadataProvider) waitForScheduledIndex(idxDefn *c.IndexDefn) error {
 
 					token, err1 := mc.GetStopScheduleCreateToken(idxDefn.DefnId)
 					if err1 != nil {
-						o.repo.cancelEvent(idxDefn.DefnId, err1)
-						return
+						logging.Warnf("MetadataProvider::waitForScheduledIndex failed to read delete command token for index defn %v with error %v",
+							idxDefn.DefnId, err1)
+						if count > 20 {
+							o.repo.cancelEvent(idxDefn.DefnId, err1)
+							return
+						}
+						continue
 					}
 
 					if token != nil {
@@ -1310,11 +1322,14 @@ func (o *MetadataProvider) waitForScheduledIndex(idxDefn *c.IndexDefn) error {
 							return
 						}
 					}
+				case <-closeCh:
+					return
 				}
 			}
 		}
 
 		go checkForTokens()
+		defer close(closeCh)
 
 		// Wait for the notification
 		err, _ = <-e.notifyCh
