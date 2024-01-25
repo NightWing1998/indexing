@@ -920,7 +920,6 @@ func TestRebalanceOutNewerNodeInMixedMode(t *testing.T) {
 // exit cluster config -
 // [0: kv n1ql] [1: index] [2: index]
 func TestReplicaRepairInMixedModeRebalance(t *testing.T) {
-	t.Skipf("Disabled until MB-60242 is fixed")
 	skipShardAffinityTests(t)
 
 	status := getClusterStatus()
@@ -983,6 +982,9 @@ func TestReplicaRepairInMixedModeRebalance(t *testing.T) {
 			break
 		}
 		if _, exists := dropIndicesMap[defn.Name]; !exists {
+			if strings.Contains(defn.Name, "#primary") {
+				continue
+			}
 			// pick the replica ID of the first instance
 			dropIndicesMap[defn.Name] = int(defn.Instances[0].ReplicaId)
 		}
@@ -998,6 +1000,9 @@ func TestReplicaRepairInMixedModeRebalance(t *testing.T) {
 			break
 		}
 		if _, exists := dropIndicesMap[defn.Name]; !exists {
+			if strings.Contains(defn.Name, "#primary") {
+				continue
+			}
 			// pick the replica ID of the first instance
 			dropIndicesMap[defn.Name] = int(defn.Instances[0].ReplicaId)
 		}
