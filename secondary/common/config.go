@@ -16,6 +16,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"reflect"
 	"runtime"
@@ -3554,6 +3555,16 @@ var SystemConfig = Config{
 		false, // mutable,
 		false, // case-insensitive
 	},
+	"indexer.debug.capture_system_state": ConfigValue{
+		map[string]interface{}{
+			"cpu":  75,
+			"heap": 80,
+		},
+		"Capture system state (like memory, CPU) if it is beyond a threshold and save to the local system. 0 threshold disables state capture. IMP: this flag is only for debugging purposes and is not advised to be used in production as it incurs additional I/O and CPU usage",
+		map[string]interface{}{},
+		false,
+		false,
+	},
 	"indexer.planner.honourNodesInDefn": ConfigValue{
 		false,
 		"With index grouping (shard-index affinity) enabled, we may violate resource contraints " +
@@ -4032,7 +4043,7 @@ var SystemConfig = Config{
 	},
 	"indexer.plasma.shardCopy.rpc.client.rateControl.adjustRatioMax": ConfigValue{
 		0.75,
-		"Client request rate maximum adjustment factor during rate control."+
+		"Client request rate maximum adjustment factor during rate control." +
 			"We can use this to limit congestion at server",
 		0.75,
 		false,
@@ -4237,7 +4248,12 @@ func (config Config) Diff(other Config) (Config, Config) {
 		if config[key].Immutable {
 			continue
 		}
-		if config[key] != other[key] {
+		if reflect.TypeOf(config[key].Value).Kind() == reflect.Map {
+			if !maps.Equal(config[key].Value.(map[string]interface{}), other[key].Value.(map[string]interface{})) {
+				diffThis[key] = config[key]
+				diffOther[key] = other[key]
+			}
+		} else if config[key] != other[key] {
 			diffThis[key] = config[key]
 			diffOther[key] = other[key]
 		}
@@ -4369,6 +4385,18 @@ func (config Config) SetValue(key string, value interface{}) error {
 	}
 
 	if defType != reflect.TypeOf(value) {
+		if strings.Contains(key, "debug.capture_system_state") && reflect.TypeOf(value).Kind() == reflect.Bool {
+			if value.(bool) {
+				cv.Value = map[string]interface{}{
+					"heap": 15,
+					"cpu":  70,
+				}
+			} else {
+				cv.Value = nil
+			}
+			config[key] = cv
+			return nil
+		}
 		return fmt.Errorf("%v: Value type mismatch, %v != %v (%v)",
 			key, valType, defType, value)
 	}

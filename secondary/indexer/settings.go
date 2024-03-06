@@ -220,6 +220,7 @@ func (s *settingsManager) handleSettings(w http.ResponseWriter, r *http.Request,
 
 	if r.Method == "POST" {
 		bytes, _ := ioutil.ReadAll(r.Body)
+		r.Body.Close()
 
 		config := s.config.FilterConfig(".settings.")
 		current, rev, err := metakv.Get(common.IndexingSettingsMetaPath)

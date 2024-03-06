@@ -93,7 +93,8 @@ var (
 
 // Backup corrupt index data files
 const (
-	CORRUPT_DATA_SUBDIR = ".corruptData"
+	CORRUPT_DATA_SUBDIR      = ".corruptData"
+	RESOURCE_DEBUGGER_SUBDIR = "profs"
 )
 
 // indexer is the central GSI class that runs the main message loop.
@@ -258,6 +259,8 @@ type indexer struct {
 	//cleanup(Close/Destroy) has been issued but not yet complete.
 	muDropCleanup      sync.Mutex
 	dropCleanupPending map[c.IndexInstId][]Slice
+
+	sysResDbgr *SystemStateLogger
 }
 
 type kvRequest struct {
@@ -374,6 +377,8 @@ func NewIndexer(config common.Config) (Indexer, Message) {
 
 		droppedIndexesDuringRebal: make(map[common.IndexInstId]bool),
 		dropCleanupPending:        make(map[common.IndexInstId][]Slice),
+
+		sysResDbgr: nil,
 	}
 
 	logging.Infof("Indexer::NewIndexer Status Warmup")
@@ -821,6 +826,9 @@ func (idx *indexer) initFromConfig() {
 		common.SetDcpMemcachedTimeout(uint32(mcdTimeout.Int()))
 		logging.Infof("memcachedTimeout set to %v\n", uint32(mcdTimeout.Int()))
 	}
+
+	idx.initSysResDbgr()
+	go expandGA()
 }
 
 func GetHTTPMux() *http.ServeMux {
@@ -8664,6 +8672,9 @@ func (idx *indexer) handleStorageWarmupDone(msg Message) {
 	// Initialize the public REST API server after indexer bootstrap is completed
 	NewRestServer(idx.config["clusterAddr"].String(), idx.statsMgr)
 
+	if idx.sysResDbgr != nil {
+		go idx.sysResDbgr.Run()
+	}
 	go idx.monitorMemUsage()
 	go idx.logMemstats()
 	go idx.collectProgressStats(true)
@@ -12852,4 +12863,39 @@ func (idx *indexer) getPartnStats(indexInst *common.IndexInst) map[common.Partit
 		res[partnId] = idx.stats.GetPartitionStats(indexInst.InstId, partnId)
 	}
 	return res
+}
+
+// only call after initFromConfig is called
+func (idx *indexer) initSysResDbgr() {
+	var path = filepath.Join(idx.config["storage_dir"].Value.(string), RESOURCE_DEBUGGER_SUBDIR)
+	c.NewRetryHelper(5, 10*time.Millisecond, 1, func(attempt int, lastErr error) error {
+		if lastErr != nil {
+			logging.Warnf("idx::initSysResDbgr: failed to start resource debugger with err %v. Retrying...",
+				lastErr)
+		}
+		var dbgr, err = NewSystemStateLogger(path, []resourceTracker{
+			NewGoheapResourceTracker(idx.stats.memoryQuota, idx.stats.memoryUsed, 70),
+		})
+		if err == nil {
+			idx.sysResDbgr = dbgr
+		}
+		return err
+	}).Run()
+}
+
+var gMemUser []byte
+
+func init() {
+	gMemUser = make([]byte, 1024)
+}
+
+func expandGA() {
+	var ticker = time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+	for range ticker.C {
+		gMemUser = append(gMemUser, make([]byte, 1024)...)
+		if len(gMemUser) > 1024*1024*100 {
+			return
+		}
+	}
 }
