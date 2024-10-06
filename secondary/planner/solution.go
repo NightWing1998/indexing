@@ -609,6 +609,9 @@ func (s *Solution) PrintLayout() {
 			}
 		}
 	}
+	if s.shardDealer != nil {
+		s.shardDealer.LogDealerStats()
+	}
 }
 
 // This prints out compact layout for the solution. Omitting verbose info about the each sub-index

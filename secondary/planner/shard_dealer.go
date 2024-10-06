@@ -134,20 +134,36 @@ type ShardDealer struct {
 	nodeToShardCountMap map[string]uint64
 
 	// config
+	alternateShardIDGenerator func() (*c.AlternateShardId, error)
+
 	minShardsPerNode      uint64
 	minPartitionsPerShard uint64
 	shardCapacityPerNode  uint64
-
-	alternateShardIDGenerator func() (*c.AlternateShardId, error)
 }
 
 func (sd *ShardDealer) logDealerConfig() {
 	logging.Infof(
-		"ShardDealer::logDealerConfig: config - minShardsPerNode %v; minPartitionsPerShard %v; shardCapacityPerNode - %v;",
+		"ShardDealer::log: config minShardsPerNode %v; minPartitionsPerShard %v; shardCapacityPerNode - %v;",
 		sd.minShardsPerNode,
 		sd.minPartitionsPerShard,
 		sd.shardCapacityPerNode,
 	)
+}
+
+// LogDealerStats - logs state of internal structs of shard dealer
+func (sd *ShardDealer) LogDealerStats() {
+	logging.Infof("ShardDealer::log: Stats **************************")
+	sd.logDealerConfig()
+	logging.Infof("ShardDealer::log: total system slots - %v. shards per category -",
+		len(sd.slotsMap))
+	logging.Infof("\t\t* %v - %v", StandardShardCategory, len(sd.slotsPerCategory[StandardShardCategory]))
+	logging.Infof("\t\t* %v - %v", VectorShardCategory, len(sd.slotsPerCategory[VectorShardCategory]))
+	logging.Infof("\t\t* %v - %v", BhiveShardCategory, len(sd.slotsPerCategory[BhiveShardCategory]))
+	logging.Infof("ShardDealer::log: total definitions with slots %v", len(sd.partnSlots))
+	logging.Infof("ShardDealer::log: shards per node - ")
+	for nodeUUID, shardCount := range sd.nodeToShardCountMap {
+		logging.Infof("\t\t* %v - %v", nodeUUID, shardCount)
+	}
 }
 
 // NewShardDealer is a constructor for the ShardDealer
@@ -304,6 +320,18 @@ func (sd *ShardDealer) GetSlot(defnID c.IndexDefnId, partnID c.PartitionId,
 	defer logging.Tracef("ShardDealer::GetSlot done for defnID %v", defnID)
 
 	var mainstoreShard, backstoreShard *c.AlternateShardId
+	var successPass = "init"
+
+	var defnJSONLog = func(replicaID int, nodeUUID string) string {
+		return fmt.Sprintf("{defnID: %v, partnID: %v, replicaID: %v, node: %v}",
+			defnID,
+			partnID,
+			replicaID,
+			nodeUUID,
+		)
+	}
+
+	var defnDbgLog = fmt.Sprintf("(d: %v, p: %v)", defnID, partnID)
 
 	// setStoreAnAllUsages is util func to set mainstoreShard, backstoreShard on all
 	// index usages in replica map. only call once mainstore and backstore have the SlotID and
@@ -314,11 +342,8 @@ func (sd *ShardDealer) GetSlot(defnID c.IndexDefnId, partnID c.PartitionId,
 			for idxrNode, indexUsage := range nodeMap {
 				if indexUsage == nil {
 					logging.Warnf(
-						"ShardDealer::GetSlot: nil index {defnID: %v, replicaID: %v, partnID: %v, nodeUUID: %v}. skipping",
-						defnID,
-						replicaID,
-						"-",
-						idxrNode.NodeUUID,
+						"ShardDealer::GetSlot: nil index %v. skipping",
+						defnJSONLog(replicaID, idxrNode.NodeUUID),
 					)
 					continue
 				}
@@ -339,23 +364,18 @@ func (sd *ShardDealer) GetSlot(defnID c.IndexDefnId, partnID c.PartitionId,
 					// Index Usage existing shard ID does not match with ShardDealer book
 					// keeping slot. force update the same
 					logging.Warnf(
-						"ShardDealer::GetSlot: index {defnID: %v, replicaID: %v, partnID: %v, nodeUUID: %v} curr shards %v does not match shard dealer book keeping. Forcing new Alternate Shards",
-						defnID,
-						replicaID,
-						indexUsage.PartnId,
-						idxrNode.NodeUUID,
+						"ShardDealer::GetSlot: index %v curr shards %v does not match shard dealer book keeping. Forcing new Alternate Shards",
+						defnJSONLog(replicaID, idxrNode.NodeUUID),
 						indexUsage.AlternateShardIds,
 					)
 				}
 
 				indexUsage.AlternateShardIds = shardIDs
 				logging.Infof(
-					"ShardDealer::GetSlot: assiging AlternateShardIDs %v to index {defnID: %v, replicaID: %v, partnID: %v, nodeUUID: %v}",
+					"ShardDealer::GetSlot: assiging AlternateShardIDs %v to index %v from pass - %v",
 					shardIDs,
-					defnID,
-					replicaID,
-					indexUsage.PartnId,
-					idxrNode.NodeUUID,
+					defnJSONLog(replicaID, idxrNode.NodeUUID),
+					successPass,
 				)
 			}
 		}
@@ -370,12 +390,9 @@ func (sd *ShardDealer) GetSlot(defnID c.IndexDefnId, partnID c.PartitionId,
 				var err = sd.RecordIndexUsage(indexUsage, idxrNode, false)
 				if err != nil {
 					logging.Warnf(
-						"ShardDealer::GetSlot failed to update book keeping with err %v for index {defnID: %v, replicaID: %v, partnID: %v, nodeUUID: %v}",
+						"ShardDealer::GetSlot failed to update book keeping with err %v for index %v",
 						err,
-						defnID,
-						replicaID,
-						indexUsage.PartnId,
-						idxrNode.NodeUUID,
+						defnJSONLog(replicaID, idxrNode.NodeUUID),
 					)
 
 					indexUsage.AlternateShardIds = nil
@@ -398,19 +415,78 @@ func (sd *ShardDealer) GetSlot(defnID c.IndexDefnId, partnID c.PartitionId,
 		backstoreShard.SetGroupId(1)
 	}
 
+	var ensureReplicaPosition = func() {
+		if mainstoreShard == nil {
+			panic("ShardDealer ensureReplicaPosition called without setting shards")
+		}
+		var slot = mainstoreShard.GetSlotId()
+		var slotToGroupMap = sd.slotsMap[slot]
+		if slotToGroupMap == nil {
+			return
+		}
+
+		var realignedMap = make(map[int]map[*IndexerNode]*IndexUsage)
+		var toDelMap = make(map[int]bool)
+
+		for replicaID, inputNodeMap := range replicaMap {
+			if slotToGroupMap[uint8(replicaID)] == nil {
+				continue
+			}
+
+			for node, inst := range inputNodeMap {
+				if node == nil || inst == nil {
+					logging.Warnf("ShardDealer::GetSlot got nil indexnode/indexusage for %v",
+						defnJSONLog(replicaID, "-"))
+					continue
+				}
+
+				var nodeSlots = sd.nodeToSlotMap[node.NodeUUID]
+				if nodeSlots == nil {
+					continue
+				}
+
+				if nodeSlots[slot] == 0 || nodeSlots[slot] == uint8(replicaID) {
+					continue
+				}
+
+				logging.Infof("ShardDealer::GetSlot realigning to make sure replica %v goes to node %v",
+					nodeSlots[slot], node.NodeUUID)
+
+				var newReplicaID = int(nodeSlots[slot])
+				if realignedMap[newReplicaID] == nil {
+					realignedMap[newReplicaID] = make(map[*IndexerNode]*IndexUsage)
+				}
+				realignedMap[newReplicaID][node] = inst
+				inst.Instance.ReplicaId = newReplicaID
+
+				toDelMap[replicaID] = true
+			}
+		}
+
+		for delReplicaID := range toDelMap {
+			delete(replicaMap, delReplicaID)
+		}
+
+		for newReplicaID, outputNodeMap := range realignedMap {
+			replicaMap[newReplicaID] = outputNodeMap
+		}
+	}
+
 	// Check if defnID already has a slot assigned. If that is the case, use the same slot to
 	// maintain consistency
 	if alternateShardMap, exists := sd.partnSlots[defnID]; exists && len(alternateShardMap) > 0 {
 		if alternateShard, exists := alternateShardMap[partnID]; exists && alternateShard != 0 {
 			logging.Tracef(
-				"ShardDealer::GetSlot slot %v already in-use for defn %v. setting slot on all indexes in %v",
+				"ShardDealer::GetSlot slot %v already in-use for index %v. setting slot on all indexes in %v",
 				alternateShard,
-				defnID,
+				defnDbgLog,
 				replicaMap,
 			)
 
 			// update shards
 			setSlotInShards(alternateShard)
+
+			ensureReplicaPosition()
 
 			// update index usages
 			setStoreOnAllUsages()
@@ -445,18 +521,21 @@ func (sd *ShardDealer) GetSlot(defnID c.IndexDefnId, partnID c.PartitionId,
 	}
 
 	logging.Debugf(
-		"ShardDealer::GetSlot nodes under minShardsPerNode - %v, all nodes - %v for defnID %v",
+		"ShardDealer::GetSlot nodes under minShardsPerNode - %v, all nodes - %v for index %v",
 		nodesUnderMinShards,
 		nodesForShard,
-		defnID,
+		defnDbgLog,
 	)
 
 	if len(nodesUnderMinShards) == len(nodesForShard) {
 		// all nodes under min shard. create new alternate shards and return
+
+		successPass = "0"
+
 		logging.Tracef(
-			"ShardDealer::GetSlot pass-0 success. all nodes %v under min shard capacity. creating new slot for defnID %v",
+			"ShardDealer::GetSlot pass-0 success. all nodes %v under min shard capacity. creating new slot for inst %v",
 			nodesUnderMinShards,
-			defnID,
+			defnDbgLog,
 		)
 
 		var newSlotID, err = sd.getNewAlternateSlotID()
@@ -485,8 +564,8 @@ func (sd *ShardDealer) GetSlot(defnID c.IndexDefnId, partnID c.PartitionId,
 				continue
 			}
 			indexShardCategory = getIndexCategory(index)
-			logging.Debugf("ShardDealer::GetSlot shard category for inst (d:%v-i:%v-p:%v) is %v",
-				defnID, index.InstId, index.PartnId, indexShardCategory)
+			logging.Debugf("ShardDealer::GetSlot shard category for inst %v is %v",
+				defnDbgLog, indexShardCategory)
 			if indexShardCategory != InvalidShardCategory {
 				break
 			}
@@ -494,8 +573,8 @@ func (sd *ShardDealer) GetSlot(defnID c.IndexDefnId, partnID c.PartitionId,
 	}
 	if indexShardCategory == InvalidShardCategory {
 		logging.Warnf(
-			"ShardDealer::GetSlot index defn %v not of a valid shard category. skipping slot allotment",
-			defnID,
+			"ShardDealer::GetSlot index inst %v not of a valid shard category. skipping slot allotment",
+			defnDbgLog,
 		)
 		return 0
 	}
@@ -561,14 +640,20 @@ func (sd *ShardDealer) GetSlot(defnID c.IndexDefnId, partnID c.PartitionId,
 
 		if minSlot == 0 {
 			// this scenario should not be possible
-			logging.Warnf("ShardDealer::GetSlot failed to get min slot from %v for defnID %v",
-				commonSlotIDs, defnID)
+			logging.Warnf("ShardDealer::GetSlot failed to get min slot from available slots %v as they are not available on all nodes for index %v",
+				commonSlotIDs,
+				defnJSONLog(-1, ""),
+			)
 		} else {
-			logging.Debugf("ShardDealer::GetSlot pass-1 success. using common slot %v for defnID %v as it is under soft limit",
-				commonSlotIDs[0], defnID)
+			successPass = "1"
+
+			logging.Debugf("ShardDealer::GetSlot pass-1 success. using common slot %v for inst %v as it is under soft limit",
+				commonSlotIDs[0], defnDbgLog)
 
 			// set minSlot to shards
 			setSlotInShards(minSlot)
+
+			ensureReplicaPosition()
 
 			// update index usages
 			setStoreOnAllUsages()
@@ -590,10 +675,13 @@ func (sd *ShardDealer) GetSlot(defnID c.IndexDefnId, partnID c.PartitionId,
 	logging.Debugf("ShardDealer::GetSlot nodes under shard capacity - %v", nodesUnderShardCapacity)
 	if len(nodesUnderShardCapacity) == len(nodesForShard) {
 		// all nodes under min shard. create new alternate shards and return
+
+		successPass = "2"
+
 		logging.Tracef(
-			"ShardDealer::GetSlot pass-2 success. all nodes %v under shard capacity. creating new slot for defnID %v",
+			"ShardDealer::GetSlot pass-2 success. all nodes %v under shard capacity. creating new slot for inst %v",
 			nodesUnderMinShards,
-			defnID,
+			defnDbgLog,
 		)
 
 		var newSlotID, err = sd.getNewAlternateSlotID()
@@ -664,14 +752,21 @@ func (sd *ShardDealer) GetSlot(defnID c.IndexDefnId, partnID c.PartitionId,
 
 		if minSlot == 0 {
 			// this scenario should not be possible
-			logging.Warnf("ShardDealer::GetSlot failed to get min slot from %v for defnID %v",
-				commonSlotIDs, defnID)
+			logging.Warnf("ShardDealer::GetSlot failed to get common slot from available slots %v across all nodes for inst %v",
+				commonSlotIDs,
+				defnJSONLog(-1, ""),
+			)
 		} else {
-			logging.Debugf("ShardDealer::GetSlot pass-3 success. using common slot %v for defnID %v as it is under soft limit",
-				commonSlotIDs[0], defnID)
+
+			successPass = "3"
+
+			logging.Debugf("ShardDealer::GetSlot pass-3 success. using common slot %v for inst %v as it is under soft limit",
+				commonSlotIDs[0], defnDbgLog)
 
 			// set minSlot to all shards
 			setSlotInShards(minSlot)
+
+			ensureReplicaPosition()
 
 			// update index usages
 			setStoreOnAllUsages()
@@ -690,6 +785,8 @@ func (sd *ShardDealer) GetSlot(defnID c.IndexDefnId, partnID c.PartitionId,
 	}
 
 	// FailSafe - no common slot found across nodes. Create a new slot
+	successPass = "overflow"
+
 	logging.Warnf(
 		"ShardDealer::GetSlot no common slot found across nodes %v for category %v. Creating new shard beyond shard capacity",
 		nodesUnderShardCapacity,
