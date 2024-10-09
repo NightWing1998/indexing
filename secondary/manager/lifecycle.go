@@ -2748,6 +2748,11 @@ func (m *LifecycleMgr) handleDeleteBucket(bucket string, content []byte) error {
 	}
 
 	//
+	// Cleanup defn cache
+	//
+	m.cleanupDefnCache(bucket, "", "", true)
+
+	//
 	// Drop create token
 	//
 	result = m.deleteCreateTokenForBucket(bucket)
@@ -2862,6 +2867,11 @@ func (m *LifecycleMgr) handleDeleteCollection(key string, content []byte) error 
 	} else if err != fdb.FDB_RESULT_KEY_NOT_FOUND {
 		result = err
 	}
+
+	//
+	// Cleanup defn cache
+	//
+	m.cleanupDefnCache(bucket, scope, collection, false)
 
 	//
 	// Drop create token
@@ -5789,4 +5799,13 @@ type indexNameRequest struct {
 	defnId    common.IndexDefnId
 	startTime int64
 	timeout   int64
+}
+
+func (m *LifecycleMgr) cleanupDefnCache(bucket, scope, collection string, isBucket bool) {
+	for defnID, defn := range m.repo.defnCache {
+		if defn != nil && defn.Bucket == bucket && (isBucket ||
+			(defn.Scope == scope && defn.Collection == collection)) {
+			m.repo.DropIndexById(defnID)
+		}
+	}
 }
