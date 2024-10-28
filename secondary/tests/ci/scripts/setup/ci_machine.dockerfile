@@ -16,7 +16,7 @@ RUN ln -s /usr/bin/python3 /usr/bin/python && \
 
 ARG USERNAME=cbci
 
-RUN useradd -rm -d /home/bot -s /bin/bash -g root -G root bot
+RUN useradd -rm -d /home/bot -s /bin/bash -u 1300 -g root -G root bot
 
 RUN mkdir /home/bot/.ssh /home/bot/.cbdepscache /home/bot/.cbdepcache
 RUN mkdir /var/www

@@ -11,6 +11,7 @@ services:
         CIBOT: false
         MODE: "unit,functional"
         USERNAME: $GITHUB_USERNAME # gerrit username
+        CONTAINER_INIT_SCRIPT: $CONTAINER_INIT_SCRIPT
       tags:
         - ci_machine:latest
         - ci_machine:$PEGGED
@@ -30,11 +31,12 @@ services:
       - "9000-9120/tcp"
       - 2222:22
     volumes:
-      - build:/home/bot/build:rw
+      - /Users/dhruvil.shah/cs/morpheus:/home/bot/build:rw
       - var-www:/var/www:rw
       - depscache:/home/bot/.cbdepscache:rw
       - depscache:/home/bot/.cbdepcache:rw
       - $HOME/testdata:/home/bot/testdata
+    entrypoint: /home/bot/build/goproj/src/github.com/couchbase/indexing/secondary/tests/ci/scripts/setup/standalone-runner.sh
   apache:
     build:
       dockerfile: apache_server.dockerfile
