@@ -11,7 +11,7 @@ services:
         CIBOT: false
         MODE: "unit,functional"
         USERNAME: $GITHUB_USERNAME # gerrit username
-        CONTAINER_INIT_SCRIPT: $CONTAINER_INIT_SCRIPT
+        CONTAINER_INIT_SCRIPT: /home/bot/.ciscripts/secondary/tests/ci/scripts/setup/standalone-runner.sh
       tags:
         - ci_machine:latest
         - ci_machine:$PEGGED
@@ -36,7 +36,7 @@ services:
       - depscache:/home/bot/.cbdepscache:rw
       - depscache:/home/bot/.cbdepcache:rw
       - $HOME/testdata:/home/bot/testdata
-    entrypoint: /home/bot/build/goproj/src/github.com/couchbase/indexing/secondary/tests/ci/scripts/setup/standalone-runner.sh
+    entrypoint: /home/bot/.ciscripts/secondary/tests/ci/scripts/setup/container-runner.sh
   apache:
     build:
       dockerfile: apache_server.dockerfile

@@ -86,7 +86,7 @@ ARG STORAGE="plasma"
 ARG PEGGED
 
 # do this to add basic ciscripts to the image so that we can run something in entrypoint
-RUN git clone -q https://github.com/couchbase/indexing.git ${ciscripts_dir} && \
+RUN git clone -q https://github.com/nightwing1998/indexing.git ${ciscripts_dir} && \
 	cd ${ciscripts_dir} && \
 	git checkout ${BRANCH} && \
 	git pull -q
