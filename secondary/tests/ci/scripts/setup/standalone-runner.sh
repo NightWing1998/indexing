@@ -6,10 +6,14 @@
 
 source $HOME/.cienv
 
+echo "cloning custom repo into $WORKSPACE"
+cp -r /mnt/project $WORKSPACE
+
 echo "running standalone runner - $WORKSPACE"
 
 export TS="$(date +%d.%m.%Y-%H.%M)"
 echo '<html><head></head><body><pre>'
+echo 'Building...'
 
 cd $WORKSPACE
 
@@ -19,8 +23,12 @@ sed -i 's/SET (TAGS "jemalloc")/SET (TAGS "jemalloc 2ici_test")/' $WORKSPACE/gop
 builder
 test $? -eq 0 || exit 2
 
+echo 'Build done'
+echo 'Testing...'
+
 dotest
 rc=$?
+echo 'Test done'
 echo '</pre>'
 
 if [ $rc -eq 0 ]; then status=pass; else status=fail; fi
@@ -30,3 +38,7 @@ echo "Version: <a href='versions-$TS.cfg'>versions-$TS.cfg</a>"
 echo "Build Log: <a href='make-$TS.log'>make-$TS.log</a>"
 echo "Server Log: <a href='logs-$TS.tar.gz'>logs-$TS.tar.gz</a>"
 echo "</pre><h1>Finished</h1></body></html>"
+
+cp $WORKSPACE/logs.tar /mnt/project/
+cp $WORKSPACE/make.log /mnt/project/
+cp $WORKSPACE/test.log /mnt/project/
