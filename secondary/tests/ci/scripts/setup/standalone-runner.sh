@@ -4,15 +4,15 @@
 # dobuild clones gerrit patches. here the expectation is that
 # all the clone has happened already in the $WORKSPACE
 
-echo "sourcing $HOME/.cienv"
 source $HOME/.cienv
 
 echo "running standalone runner - $WORKSPACE"
 
-echo "dbg what is there is indexing?"
-ls $WORKSPACE/goproj/src/github.com/couchbase/indexing
+whoami
 
 cd /var/www
+ls -al /var
+
 export TS="$(date +%d.%m.%Y-%H.%M)"
 echo '<html><head></head><body><pre>' >/var/www/gsi-current.html
 chmod a+rx /var/www/gsi-current.html
