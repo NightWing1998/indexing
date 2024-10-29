@@ -1,17 +1,17 @@
 # syntax=docker/dockerfile:1.4
 FROM ubuntu:noble
 
-RUN apt-get update && \
+RUN apt-get update &&
 	DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC apt-get install -y build-essential lsof lshw sysstat net-tools numactl bzip2 runit ca-certificates gpg wget curl git locales locales-all vim gdb nano
 
-RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - | tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null && \
-	echo 'deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ noble main' | tee /etc/apt/sources.list.d/kitware.list >/dev/null && \
-	apt-get update &&  rm /usr/share/keyrings/kitware-archive-keyring.gpg && \
-	apt-get install kitware-archive-keyring && \
+RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - | tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null &&
+	echo 'deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ noble main' | tee /etc/apt/sources.list.d/kitware.list >/dev/null &&
+	apt-get update && rm /usr/share/keyrings/kitware-archive-keyring.gpg &&
+	apt-get install kitware-archive-keyring &&
 	DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC apt-get install cmake -y
 
-RUN ln -s /usr/bin/python3 /usr/bin/python && \
-	export REPO=$(mktemp /tmp/repo.XXXXXXXXX) && \
+RUN ln -s /usr/bin/python3 /usr/bin/python &&
+	export REPO=$(mktemp /tmp/repo.XXXXXXXXX) &&
 	curl -o ${REPO} https://storage.googleapis.com/git-repo-downloads/repo && install -m 755 ${REPO} /usr/bin/repo
 
 ARG USERNAME=cbci
@@ -21,7 +21,7 @@ RUN useradd -rm -d /home/bot -s /bin/bash -u 1300 -g root -G root bot
 RUN mkdir /home/bot/.ssh /home/bot/.cbdepscache /home/bot/.cbdepcache
 RUN mkdir /var/www
 
-RUN cat > /home/bot/.ssh/config <<EOF
+RUN cat >/home/bot/.ssh/config <<EOF
 Host github.com
 	User git
 	Hostname github.com
@@ -86,13 +86,13 @@ ARG STORAGE="plasma"
 ARG PEGGED
 
 # do this to add basic ciscripts to the image so that we can run something in entrypoint
-RUN git clone -q https://github.com/nightwing1998/indexing.git ${ciscripts_dir} && \
-	cd ${ciscripts_dir} && \
-	git checkout ${BRANCH} && \
+RUN git clone -q https://github.com/nightwing1998/indexing.git ${ciscripts_dir} &&
+	cd ${ciscripts_dir} &&
+	git checkout ${BRANCH} &&
 	git pull -q
 
 # setup .cienv file on the basis of ARGS
-COPY <<EOF /home/bot/.cienv
+COPY /home/bot/.cienv <<EOF
 export WORKSPACE=${WORKSPACE}
 export CINAME=${CINAME}
 export CIBOT=${CIBOT}
@@ -106,7 +106,7 @@ export PATH=$PATH:${ciscripts_dir}/secondary/tests/ci/scripts/
 alias repo='repo --color=never'
 EOF
 
-COPY <<EOF /home/bot/.gitconfig
+COPY /home/bot/.gitconfig <<EOF
 [user]
 	name = CB Robot
 	email = build@northscale

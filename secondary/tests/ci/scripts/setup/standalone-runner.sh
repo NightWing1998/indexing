@@ -4,6 +4,7 @@
 # dobuild clones gerrit patches. here the expectation is that
 # all the clone has happened already in the $WORKSPACE
 
+echo "sourcing $HOME/.cienv"
 source $HOME/.cienv
 
 echo "running standalone runner - $WORKSPACE"
