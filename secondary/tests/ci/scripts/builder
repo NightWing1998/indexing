@@ -1,5 +1,10 @@
 #!/bin/bash
 
+error_exit() {
+  echo "</pre><h3>Server build failed: $1</h3><pre>"
+  exit 2
+}
+
 FORCEX86=0
 if [ "$(echo $1 | tr 'A-Z' 'a-z')" = "-forcex86" ]; then
 	FORCEX86=1
