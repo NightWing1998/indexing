@@ -36,7 +36,7 @@ services:
       - depscache:/home/bot/.cbdepscache:rw
       - depscache:/home/bot/.cbdepcache:rw
       - $HOME/testdata:/home/bot/testdata
-    entrypoint: /home/bot/.ciscripts/secondary/tests/ci/scripts/setup/container-runner.sh
+    entrypoint: /home/bot/.ciscripts/secondary/tests/ci/scripts/setup/standalone-runner.sh
   apache:
     build:
       dockerfile: apache_server.dockerfile
