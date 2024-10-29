@@ -4,6 +4,8 @@
 # dobuild clones gerrit patches. here the expectation is that
 # all the clone has happened already in the $WORKSPACE
 
+source $HOME/.cienv
+
 echo "running standalone runner - $WORKSPACE"
 
 echo "dbg what is there is indexing?"
