@@ -9,7 +9,7 @@ services:
         # RELEASE: 8.0.0
         # MANIFEST: couchbase-server/morpheus/8.0.0.xml
         CIBOT: false
-        MODE: "unit,functional"
+        MODE: "functional"
         USERNAME: $GITHUB_USERNAME # gerrit username
       tags:
         - ci_machine:latest

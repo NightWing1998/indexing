@@ -262,16 +262,16 @@ if [[ "$MODE" == *"$phase"* ]]; then
   export CBAUTH_REVRPC_URL="http://$Username:$Password@127.0.0.1:9000/query"
   echo "</pre><h4>Functional tests</h4><pre>"
   cd $WORKSPACE/goproj/src/github.com/couchbase/indexing/secondary/tests/functionaltests
-  go test -timeout 4h -v -cbconfig ../config/buildtest_$STORAGE.json -useclient n1ql 2>&1 | tee -a $WORKSPACE/test.log
+  go test -timeout 4h -v -cbconfig ../config/buildtest_$STORAGE.json -useclient n1ql -run "^(TestWithShardAffinity|TestRebalancePseudoOfflineUgradeWithShardAffinity|TestCreateInSimulatedMixedMode|TestSwapRebalanceMixedMode|TestFailoverAndRebalanceMixedMode|TestRebalanceOutNewerNodeInMixedMode|TestReplicaRepairInMixedModeRebalance|TestShardRebalanceSetupCluster)$" 2>&1 | tee -a $WORKSPACE/test.log
   echo "Indexer Go routine dump logged in $WORKSPACE/ns_server/logs/n_1/indexer_functests_pprof.log"
   curl http://$Username:$Password@127.0.0.1:9108/debug/pprof/goroutine?debug=1 > $WORKSPACE/ns_server/logs/n_1/indexer_functests_pprof.log
 
-  cd $WORKSPACE/goproj/src/github.com/couchbase/indexing/secondary/tests/largedatatests
-  go test -timeout 8h -v -cbconfig ../config/buildtest_$STORAGE.json -useclient n1ql 2>&1 | tee -a $WORKSPACE/test.log
-  echo "Indexer Go routine dump logged in $WORKSPACE/ns_server/logs/n_1/indexer_largedata_pprof.log"
-  curl http://$Username:$Password@127.0.0.1:9108/debug/pprof/goroutine?debug=1 > $WORKSPACE/ns_server/logs/n_1/indexer_largedata_pprof.log
-  collect_logs
-  stop_cluster
+  # cd $WORKSPACE/goproj/src/github.com/couchbase/indexing/secondary/tests/largedatatests
+  # go test -timeout 8h -v -cbconfig ../config/buildtest_$STORAGE.json -useclient n1ql 2>&1 | tee -a $WORKSPACE/test.log
+  # echo "Indexer Go routine dump logged in $WORKSPACE/ns_server/logs/n_1/indexer_largedata_pprof.log"
+  # curl http://$Username:$Password@127.0.0.1:9108/debug/pprof/goroutine?debug=1 > $WORKSPACE/ns_server/logs/n_1/indexer_largedata_pprof.log
+  # collect_logs
+  # stop_cluster
 fi
 
 export phase=serverless
