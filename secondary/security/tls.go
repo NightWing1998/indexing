@@ -33,9 +33,9 @@ import (
 
 var userAgentPrefix = "Go-http-client/1.1-indexer-"
 
-func getCertPool(setting *SecuritySetting) (*x509.CertPool, error) {
+func getCertPoolForServer(setting *SecuritySetting) (*x509.CertPool, error) {
 
-	certInBytes := setting.certInBytes
+	certInBytes := setting.srvrCertInBytes
 	caInBytes := setting.caInBytes
 
 	if len(caInBytes) == 0 && len(certInBytes) == 0 {
@@ -54,6 +54,34 @@ func getCertPool(setting *SecuritySetting) (*x509.CertPool, error) {
 			return nil, err
 		}
 	} else {
+		ok := caCertPool.AppendCertsFromPEM(certInBytes)
+		if !ok {
+			err := fmt.Errorf("Cannot load certificates from certFile")
+			logging.Errorf("%v", err)
+			return nil, err
+		}
+	}
+
+	return caCertPool, nil
+}
+
+func getCertPoolForClient(setting *SecuritySetting) (*x509.CertPool, error) {
+
+	certInBytes := setting.clientCertInBytes
+	caInBytes := setting.caInBytes
+
+	caCertPool := x509.NewCertPool()
+
+	// Prioritise caFile over certFile for root and client CAs.
+
+	if len(caInBytes) != 0 {
+		ok := caCertPool.AppendCertsFromPEM(caInBytes)
+		if !ok {
+			err := fmt.Errorf("Cannot load certificates from caFile")
+			logging.Errorf("%v", err)
+			return nil, err
+		}
+	} else if len(certInBytes) > 0 {
 		ok := caCertPool.AppendCertsFromPEM(certInBytes)
 		if !ok {
 			err := fmt.Errorf("Cannot load certificates from certFile")
@@ -87,13 +115,18 @@ func setupClientTLSConfig(host string) (*tls.Config, error) {
 	// Setup  TLSConfig
 	tlsConfig := &tls.Config{}
 
+	if setting.clientCert != nil {
+		tlsConfig.Certificates = []tls.Certificate{*setting.clientCert}
+	}
+
 	//  Set up cert pool for rootCAs
-	caCertPool, err := getCertPool(setting)
+	caCertPool, err := getCertPoolForClient(setting)
 	if err != nil {
 		return nil, fmt.Errorf("%v Can't establish ssl connection to %v", err, host)
 	}
 
 	tlsConfig.RootCAs = caCertPool
+	tlsConfig.ClientCAs = caCertPool
 
 	if IsLocal(host) {
 		// skip server verify if it is localhost
@@ -108,6 +141,8 @@ func setupClientTLSConfig(host string) (*tls.Config, error) {
 		tlsConfig.MinVersion = pref.MinVersion
 		tlsConfig.CipherSuites = pref.CipherSuites
 		tlsConfig.PreferServerCipherSuites = pref.PreferServerCipherSuites
+
+		tlsConfig.ClientAuth = pref.ClientAuthType
 	}
 
 	return tlsConfig, nil
@@ -242,7 +277,7 @@ func setupServerTLSConfig() (*tls.Config, error) {
 func getTLSConfigFromSettingForServer(setting *SecuritySetting) (*tls.Config, error) {
 
 	// Get certifiicate and cbauth config
-	cert := setting.certificate
+	cert := setting.srvrCert
 	if cert == nil {
 		err := fmt.Errorf("No certificate has been provided. Can't establish ssl connection")
 		return nil, err
@@ -268,7 +303,7 @@ func getTLSConfigFromSettingForServer(setting *SecuritySetting) (*tls.Config, er
 		// set up client cert
 		if pref.ClientAuthType != tls.NoClientCert {
 
-			caCertPool, err := getCertPool(setting)
+			caCertPool, err := getCertPoolForServer(setting)
 			if err != nil {
 				return nil, fmt.Errorf("%v Can't establish ssl connection", err)
 			}
@@ -473,18 +508,25 @@ func SetupCertificateForClient(host string, tlsConfig *tls.Config) error {
 		pref := settings.tlsPreference
 
 		//  Set up cert pool for rootCAs
-		caCertPool, err := getCertPool(settings)
+		caCertPool, err := getCertPoolForClient(settings)
 		if err != nil {
 			return fmt.Errorf("%v Can't establish ssl connection to %v", err, host)
 		}
 
+		if settings.clientCert != nil {
+			tlsConfig.Certificates = []tls.Certificate{*settings.clientCert}
+		}
+
 		tlsConfig.RootCAs = caCertPool
+		tlsConfig.ClientCAs = caCertPool
 
 		// setup prefer ciphers
 		if pref != nil {
 			tlsConfig.MinVersion = pref.MinVersion
 			tlsConfig.CipherSuites = pref.CipherSuites
 			tlsConfig.PreferServerCipherSuites = pref.PreferServerCipherSuites
+
+			tlsConfig.ClientAuth = pref.ClientAuthType
 		}
 	}
 
