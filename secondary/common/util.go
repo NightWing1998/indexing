@@ -2314,3 +2314,21 @@ func GetStorageDirs(cfg Config, se StorageEngine) (string, string) {
 	}
 	return baseDir, engineDir
 }
+
+// GetDirForIndexInst - returns the storage path for the given index instance
+func GetDirForIndexInst(storagePaths StoragePaths, inst *IndexInst) string {
+	var indexPath = storagePaths.BaseDir
+	if inst.Defn.IsBhive() {
+		indexPath = storagePaths.BhiveDir
+	} else if inst.StorageMode == PlasmaDB {
+		// only for making function complete. PlasmaDir = BaseDir
+		indexPath = storagePaths.PlasmaDir
+	} else if inst.StorageMode == MemoryOptimized {
+		// only for making function complete. MoiDir = BaseDir
+		indexPath = storagePaths.MoiDir
+	} else if inst.StorageMode == ForestDB {
+		// only for making function complete. ForestDbDir = BaseDir
+		indexPath = storagePaths.ForestDbDir
+	}
+	return indexPath
+}
