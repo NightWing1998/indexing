@@ -1155,7 +1155,7 @@ func (stm *ShardTransferManager) RestoreCodebook(
 	srcRoot, destFilePath string,
 ) error {
 
-	_, storeEngineDir := c.GetStorageDirs(stm.config, c.GetStorageEngineForIndexDefn(&vectorInst.Defn))
+	storageDir, storeEngineDir := c.GetStorageDirs(stm.config, c.GetStorageEngineForIndexDefn(&vectorInst.Defn))
 	relIdxPath := IndexPath(&vectorInst, partnId, SliceId(0))
 
 	// For shared instances create the index directory. For dedicated instances Shard Restore will have already created
@@ -1181,7 +1181,7 @@ func (stm *ShardTransferManager) RestoreCodebook(
 		}
 	}
 
-	srcFilePath := filepath.Join(storeEngineDir, srcRoot, srcFileName)
+	srcFilePath := filepath.Join(storageDir, srcRoot, srcFileName)
 	if _, err := iowrap.Os_Stat(srcFilePath); err != nil {
 		err = fmt.Errorf("error encountered for codebook in staging directory. path: %v for "+
 			"instId: %v, realInstId:%v, partnId: %v, err: %v",
